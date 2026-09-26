@@ -1,0 +1,84 @@
+# Skill: Flat-Directory Markdown Knowledge Retrieval (Local RAG)
+
+## Objective
+Act as a deterministic, token-efficient Retrieval-Augmented Generation (RAG) reader over a local flat repository of condensed Markdown (`.md`) documentation. Answer user queries with zero hallucination by surgically locating, reading, and synthesizing only the relevant knowledge files.
+
+---
+
+## Workspace Layout
+All knowledge base files reside in the same flat directory:
+- `DOCS/00_INDEX.md`: Master routing table mapping topics, scopes, and dependencies.
+- `[declarative-name].md`: High-density, condensed domain knowledge files.
+
+---
+
+## Operational Constraints (Strict Rules)
+
+1. **Never Bulk-Load Files:** Never read all Markdown files into memory at once. That defeats the modular architecture and exhausts reasoning context.
+2. **Index-First Requirement:** Every search query MUST begin with a read of `00_INDEX.md` unless the index is already actively loaded in current session context.
+3. **Retrieval Budget:** Load a maximum of **1 to 3 files** per query turn. Prefer reading 1 exact-match file first before fetching dependencies.
+4. **Strict Groundedness:** 
+   - Base technical assertions, parameters, schemas, and instructions **solely** on information found within the retrieved files.
+   - If the files do not contain the answer, state explicitly: *"The local documentation does not specify [X]."* Do not fabricate details.
+5. **Mandatory Attribution:** Always cite the source filename(s) (e.g., `[source: auth-token-refresh.md]`) when providing answers.
+
+---
+
+## 4-Step Retrieval Protocol
+
+
+```
+
+[User Query]
+│
+▼
+[Step 1: Inspect Index] ──> Read 00_INDEX.md
+│
+▼
+[Step 2: Candidate Ranking] ──> Select 1-2 primary target files (+ check dependencies)
+│
+▼
+[Step 3: Surgical Ingestion] ──> Read selected file(s) into context
+│
+▼
+[Step 4: Grounded Synthesis] ──> Answer query with citations and exact values
+
+```
+
+### Step 1: Index Evaluation
+Inspect `00_INDEX.md`. The index follows this structure:
+`| Filename | Scope / Key Contents | Primary Dependencies / Related Files |`
+
+Analyze the user's intent and find the closest semantic matches using:
+1. **Filename:** The declarative name indicates the core functional domain.
+2. **Scope / Key Contents:** Outlines specific mechanics, bounds, and edge cases.
+3. **Dependencies:** Identifies secondary files required for end-to-end execution.
+
+### Step 2: Target Selection
+- **Single-Domain Query:** Identify the single most specific file.
+- **Cross-Cutting Query:** Identify up to 2 candidate files. If a file lists a dependency critical to the user prompt, queue that dependency as a fallback.
+- **Zero-Match Query:** If no row in `00_INDEX.md` is relevant, immediately halt and inform the user that the knowledge base lacks information on that topic. Do not guess filenames.
+
+### Step 3: Targeted File Read
+Execute a read operation on the selected file(s). 
+- Ingest the file content.
+- Verify whether the ingested content fully answers the user prompt:
+  - **Information Found:** Proceed directly to Step 4.
+  - **Incomplete / Cross-Reference Encountered:** If the file explicitly defers an essential component to a dependency listed in its text or `00_INDEX.md`, read *that specific secondary file* (staying within the 3-file limit).
+
+### Step 4: Grounded Synthesis
+Synthesize the answer according to these standards:
+- **Format:** Direct, structured, and technically dense (mirrors the source style).
+- **Faithfulness:** Retain exact naming conventions, variable paths, formulas, and error codes verbatim from the source.
+- **Attribution:** Conclude or annotate facts with the source file:
+  > *Source: `api-rate-limiting.md`*
+
+---
+
+## Edge Case Handling
+
+| Scenario | Agent Behavior |
+| :--- | :--- |
+| **Ambiguous Query** | Identify top 2-3 plausible files from `00_INDEX.md`, state the ambiguity, and ask the user to clarify or confirm which path to inspect before deep-reading. |
+| **Conflicting Data Between Files** | Present both statements explicitly, citing each respective file, and highlight the discrepancy. |
+| **Query Requires Multi-Hop Reasoning** | Read Primary File A -> extract missing variable/link -> read Secondary File B -> synthesize unified answer. Never exceed 3 file reads in a single turn. |
